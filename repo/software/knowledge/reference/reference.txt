@@ -1,0 +1,13 @@
+Desc:software/knowledge/reference Software for viewing reference materials in the textual format
+
+[ ] Name:Kiwix ?GB Priority:High TODO
+    Desc:Kiwix Local wiki archive viewer, supports ZIM format
+    Repo:Kiwix PkgDocker:TODO
+
+[ ] Name:LLaMACPPSrc ?GB Priority:High,Requires:BaseDevelBin,RequiresOpt:GPUComputeLib TODO
+    Desc:LLaMACPPSrc LLM inference server source code, may be replaced with any other alternative
+
+[ ] Name:OpenWebUI ?GB Priority:Medium,Requires:LLaMACPPSrc,RequiresAny:software/dev/python TODO
+    Desc:OpenWebUI Convenient LLM chat interface
+
+Include:stackoverflow

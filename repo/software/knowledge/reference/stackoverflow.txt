@@ -1,0 +1,5 @@
+Desc:StackOverflowViewers StackOverflow Internet Archive dump viewers
+
+[ ] Name:StackedOff ?GB Default:True https://github.com/tools4j/stacked-off
+    Desc:StackedOff Local StackOverflow instance written in Kotlin
+    Repo:StackedOff TODO

@@ -1,0 +1,7 @@
+Include:software
+
+Include:knowledge
+
+Include:media
+
+Include:hardware
