@@ -1,0 +1,3 @@
+Desc:hardware Hardware which should be bought beforehand
+
+
