@@ -1,15 +1,15 @@
 Desc:software/network/dev Basic networking packages
 
-[ ] Name:NetGeneralBin ?MB Priority:Extreme TODO
+[ ] Name:NetGeneralBin ?M Priority:Extreme TODO
     Desc:NetGeneralBin General networking tools like samba/traceroute/etc (binary)
     Warn:NetGeneralBin You won't be able to set up and debug basic networking software
 
-[ ] Name:NetGeneralSrc ?MB Priority:Extreme TODO
+[ ] Name:NetGeneralSrc ?M Priority:Extreme TODO
     Desc:NetGeneralSrc Sources of general networking tools like samba/traceroute/etc
     Warn:NetGeneralSrc You won't be able to set up and debug basic networking software on a new PC
 
-[ ] Name:WebServer ?MB Priority:High TODO
+[ ] Name:WebServer ?M Priority:High TODO
     Desc:WebServer Any NGINX/Apache web server (binary), useful for setting up 
 
-[ ] Name:WebServerSrc ?MB Priority:High,Requires:BaseDevelBin TODO
+[ ] Name:WebServerSrc ?M Priority:High,Requires:BaseDevelBin TODO
     Desc:WebServerSrc Any NGINX/Apache web server source code

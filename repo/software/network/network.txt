@@ -2,10 +2,10 @@ Desc:software/network Networking tools
 
 Include:packages
 
-[ ] Name:ReticulumNS ?MB Priority:High,RequiresAny:software/dev/python TODO
+[ ] Name:ReticulumNS ?M Priority:High,RequiresAny:software/dev/python TODO
     Desc:ReticulumNS Building local networks with encryption
 
-[ ] Name:NomadNet ?MB Priority:High,Requires:ReticulumNS https://github.com/markqvist/nomadnet
+[ ] Name:NomadNet ?M Priority:High,Requires:ReticulumNS https://github.com/markqvist/nomadnet
     Desc:NomadNet LXMF-based networking software
 
 Include:mesh

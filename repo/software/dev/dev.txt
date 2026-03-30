@@ -2,14 +2,14 @@ Desc:software/dev Development tools
 
 Include:python Priority:High
 
-[ ] Name:BaseDevelBin ?GB Priority:Extreme TODO
+[ ] Name:BaseDevelBin ?G Priority:Extreme TODO
     Desc:BaseDevelBin Essential development packages (binary)
 
-[ ] Name:DockerBin ?GB Priority:High,Requires:BaseDevelBin TODO
+[ ] Name:DockerBin ?G Priority:High,Requires:BaseDevelBin TODO
     Desc:DockerBin Docker utility (binary)
 
-[ ] Name:PlatformIO ?GB Priority:High TODO
+[ ] Name:PlatformIO ?G Priority:High TODO
     Desc:PlatformIO Building PlatformIO projects (cached packages only)
 
-[ ] Name:GPUComputeLib ?GB Priority:Medium TODO
+[ ] Name:GPUComputeLib ?G Priority:Medium TODO
     Desc:GPUComputeLib NVIDIA CUDA, AMD ROCm or other backend

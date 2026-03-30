@@ -1,13 +1,13 @@
 Desc:software/network/mesh Mesh networks
 
-[ ] Name:MeshtasticSrc ?GB Priority:High,Requires:PlatformIO TODO
+[ ] Name:MeshtasticSrc ?G Priority:High,Requires:PlatformIO TODO
     Desc:MeshtasticSrc Meshtastic node source code, needs to be built at least once
 
-[ ] Name:MeshtasticApp ?GB Priority:High,Requires:MeshtasticSrc TODO
+[ ] Name:MeshtasticApp ?G Priority:High,Requires:MeshtasticSrc TODO
     Desc:MeshtasticApp Meshtastic APK
 
-[ ] Name:MeshcoreSrc ?GB Priority:High,Requires:PlatformIO TODO
+[ ] Name:MeshcoreSrc ?G Priority:High,Requires:PlatformIO TODO
     Desc:MeshcoreSrc Meshcore node source code, needs to be built at least once
 
-[ ] Name:MeshcoreApp ?GB Priority:High,Requires:MeshtasticSrc TODO
+[ ] Name:MeshcoreApp ?G Priority:High,Requires:MeshtasticSrc TODO
     Desc:MeshcoreApp Meshtastic APK
