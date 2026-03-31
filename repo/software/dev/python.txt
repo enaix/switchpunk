@@ -1,11 +1,11 @@
 Desc:software/dev/python Python environment
 Warn:software/dev/python You won't be able to run Python software due to missing dependencies
 
-[ ] Name:DevpiServer ?G Priority:High,Default:True TODO
+[.] Name:DevpiServer ?G Priority:High,Default:True TODO
     Desc:DevpiServer Advanced PyPI server with essential Python packages
 
-[ ] Name:PypiServer ?G Priority:High TODO
+[.] Name:PypiServer ?G Priority:High TODO
     Desc:PypiServer Simple PyPI server with essential Python packages
 
-[ ] Name:PyVirtualenv ?G Priority:High TODO
+[.] Name:PyVirtualenv ?G Priority:High TODO
     Desc:PyVirtualenv Virtualenv with essential Python packages, may have trouble with building local packages

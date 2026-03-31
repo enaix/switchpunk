@@ -1,8 +1,8 @@
-Desc:software/knowledge/stackoverflow StackOverflow data dump
+Desc:knowledge/reference/stackoverflow StackOverflow data dump
 
-[ ] Name:StackOverflowArchive ?G RequiresAny:software/reference/stackoverflow,Default:True TODO
+[.] Name:StackOverflowArchive ?G RequiresAny:software/reference/stackoverflow,Default:True TODO
     Desc:StackOverflowArchive StackOverflow/StackExchange dump from Internet Archive
     Repo:StackOverflowArchive TODO
 
-[ ] Name:StackOverflowZim ?G Requires:Kiwix TODO
+[.] Name:StackOverflowZim ?G Requires:Kiwix TODO
     Desc:StackOverflowZim StackOverflow dump in the ZIM format, has no StackExchange

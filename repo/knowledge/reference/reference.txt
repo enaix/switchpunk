@@ -2,7 +2,7 @@ Desc:knowledge/reference Reference materials in the textual format
 
 Include:wiki
 
-[ ] Name:LLMGGUF ?G Priority:High,Requires:LLaMACPP TODO
+[.] Name:LLMGGUF ?G Priority:High,Requires:LLaMACPP TODO
     Desc:LLMGGUF Any LLM model weights in GGUF format. Size depends on your use case
 
 Include:stackoverflow

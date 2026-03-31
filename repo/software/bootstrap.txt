@@ -1,33 +1,33 @@
 Desc:software/bootstrap Software which is essential for setting up the switchpunk node on a new PC
  
-[ ] Name:Python3Src ?G Priority:Extreme https://www.python.org/downloads/source/
+[.] Name:Python3Src ?G Priority:Extreme https://www.python.org/downloads/source/
     Desc:Python3Src Python 3 interpreter source code
     Warn:Python3Src You won't be able to install Python to a new PC
 
-[ ] Name:Python3Win ?G Priority:Extreme TODO
+[.] Name:Python3Win ?G Priority:Extreme TODO
     Desc:Python3Win Python 3 Windows installer
     Warn:Python3Win You won't be able to install Python to a new Windows PC
 
-[ ] Name:GCCStatic ?G Priority:Extreme https://gcc.gnu.org/
+[.] Name:GCCStatic ?G Priority:Extreme https://gcc.gnu.org/
     Desc:GCCStatic Statically-built GNU Compiler Collection
     Warn:GCCStatic You won't be able to compile any software on a new PC
 
-[ ] Name:MinGWSrc ?G Priority:Extreme TODO
+[.] Name:MinGWSrc ?G Priority:Extreme TODO
     Desc:MinGWSrc Sources of the GNU Compiler Collection Windows port
     Warn:MinGWSrc You won't be able to build software on a new Windows PC
 
-[ ] Name:LinuxOfflineISO ?G Priority:Extreme https://www.debian.org/CD/
+[.] Name:LinuxOfflineISO ?G Priority:Extreme https://www.debian.org/CD/
     Desc:LinuxOfflineISO Linux offline ISO (not netinst!), preferably Debian CD image 
     Warn:LinuxOfflineISO You won't be able to install Linux to a new PC
 
-[ ] Name:CommonPkgSrc ?G Priority:Extreme TODO
+[.] Name:CommonPkgSrc ?G Priority:Extreme TODO
     Desc:CommonPkgSrc Sources of the basic packages, containing essential tools and libraries
     Warn:CommonPkgSrc You won't be able to build software on a new PC due to missing libraries
 
-[ ] Name:BaseDevelSrc ?G Priority:Extreme TODO
+[.] Name:BaseDevelSrc ?G Priority:Extreme TODO
     Desc:BaseDevelSrc Sources of the base-devel package, containing essential development tools
     Warn:BaseDevelSrc You won't be able to compile software on a new PC due to missing development tool
 
-[ ] Name:DockerOffline ?G Priority:High TODO
+[.] Name:DockerOffline ?G Priority:High TODO
     Desc:DockerOffline Prepared offline installation of Docker
     Warn:DockerOffline You won't be able to install Docker on a new PC

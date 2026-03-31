@@ -1,4 +1,4 @@
 Desc:software/network/dialup Dial-up network software
 
-[ ] Name:MysticBBS ?G Priority:Medium,Require:BaseDevelBin TODO
+[.] Name:MysticBBS ?G Priority:Medium,Requires:BaseDevelBin TODO
     Desc:MysticBBS A popular BBS server

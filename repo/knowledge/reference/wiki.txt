@@ -1,9 +1,9 @@
 Desc:knowledge/reference/wiki Wikipedia & other wikis
 
-[ ] Name:WikipediaZim ?G Priority:High,Requires:Kiwix TODO
+[.] Name:WikipediaZim ?G Priority:High,Requires:Kiwix TODO
     Desc:WikipediaZim Wikipedia dump in the ZIM format
     Repo:WikipediaZim TODO
 
-[ ] Name:ArchWikiZim ?G Priority:Medium,Requires:Kiwix TODO
+[.] Name:ArchWikiZim ?G Priority:Medium,Requires:Kiwix TODO
     Desc:ArchWikiZim Archlinux wiki in the ZIM format
     Repo:ArchWikiZim TODO

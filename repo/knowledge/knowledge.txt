@@ -1,9 +1,9 @@
-Desc:software/knowledge Knowledge-related data
+Desc:knowledge Knowledge-related data
 
 Include:reference
 
-[ ] Name:Medical ?G Priority:Extreme TODO
+[.] Name:Medical ?G Priority:Extreme TODO
     Desc:Medical Medical info (if needed)
 
-[ ] Name:OSMAnd ?G Priority:High TODO
+[.] Name:OSMAnd ?G Priority:High TODO
     Desc:OSMAnd OpenStreetMap Android APK with the downloaded map
