@@ -64,6 +64,9 @@ class RequiresAttr:
         self.name = name   # Name of the item or group
         self.requires_all = requires_all  # (Only for groups) Require all items in the group, otherwise require only one
 
+    def __repr__(self) -> str:
+        return f"Requires(name={self.name}, all={self.requires_all})"
+
 
 
 class Item:
@@ -86,6 +89,11 @@ class Item:
         self.warn: Optional[str] = None  # Warning if the item is missing
         self.install_info: Optional[MutableMapping[str, str]] = None  # Installation information (package names)
 
+    def __repr__(self) -> str:
+        return f"Item(name={self.name}, status={self.status}, size={self.size}, link={self.link}, requires={self.requires}, priority={self.priority})"
+
+    def tree(self, depth=0) -> str:
+        return '   ' * depth + self.__repr__()
 
 
 class Group:
@@ -98,6 +106,12 @@ class Group:
         self.items = items  # Items or subgroups
         self.priority = priority  # Priority override
         self.default: Optional[str] = None  # Default item in current group
+
+    def __repr__(self) -> str:
+        return f"Group(name={self.name}, priority={self.priority}, default={self.default})"
+
+    def tree(self, depth=0) -> str:
+        return '   ' * depth + self.__repr__() + '\n' + '\n'.join([x.tree(depth + 1) for x in self.items.values()])
 
 
 
@@ -122,23 +136,23 @@ def _load_group(repo: Repo, repo_path: str, path: str, priority: Optional[Priori
     if not path.endswith(".txt"):
         # Get full group path from folder (foo/bar -> foo/bar/bar.txt OR foo/bar -> foo/bar.txt)
         # Group index should be located in foo/bar/xyz/xyz.txt
-        group_path = path + ".txt"
-        group_short_name = os.path.split(path)[1]  # bar
-        group_folder = os.path.join(path, group_short_name + '.txt')  # get group path in a subfolder
-        if os.path.exists(group_path):
-            if os.path.exists(group_folder):
-                raise ValueError(f"The group file {group_path} and the group folder {group_folder} cannot exist at the same time")
-            path = group_path
+        _group_path = path + ".txt"
+        _group_short_name = os.path.split(path)[1]  # bar
+        _group_folder = os.path.join(path, _group_short_name + '.txt')  # get group path in a subfolder
+        if os.path.exists(_group_path):
+            if os.path.exists(_group_folder):
+                raise ValueError(f"The group file {_group_path} and the group folder {_group_folder} cannot exist at the same time")
+            path = _group_path
         else:
-            path = group_folder
+            path = _group_folder
 
     # Convert actual path to group name
     path_base_abs = os.path.splitext(path)[0]  # Absolute path
-    path_base_split = os.path.split(path_base_abs)
-    if path_base_split[0].endswith(path_base_split[1]):
+    _path_base_split = os.path.split(path_base_abs)
+    if _path_base_split[0].endswith(_path_base_split[1]):
         # Check if this is top-level group file (foo/bar/bar.txt)
-        path_base_abs = path_base_split[0]  # foo/bar/bar -> foo/bar
-    path_base = os.path.relpath(path_base_abs, start=repo_path)
+        path_base_abs = _path_base_split[0]  # foo/bar/bar -> foo/bar
+    path_base = os.path.relpath(path_base_abs, start=repo_path)  # Relative path (from repo)
     full_group_name = Path(path_base).as_posix()
 
     #print(path, '->', full_group_name)
