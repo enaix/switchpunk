@@ -18,23 +18,30 @@ class ApproxFileSize:
 
     def __init__(self, file_size: Optional[str] = None):
         if file_size is None:
-            self.size: Optional[int] = None
-            self.unknown: Optional[str] = None
-            self.unit: Optional[str] = None
+            self.lhs_size: Optional[int] = None   # Known part of the size (4??G -> 4)
+            self.total_size: Optional[int] = None # Total approximate size (4??G -> 400)
+            self.unknown: Optional[str] = None    # Unknown part of the size (4??G -> ??)
+            self.unit: Optional[str] = None       # Letter describing the unit
         else:
             m = re.fullmatch(self.regex, file_size)
             if m is None:
                 raise ValueError(f"{file_size} is not a valid approximate file size. It should contain 0-N digits, 0-M unknown digits (?) and the size unit (K/M/G/etc)")
             self.unknown = m.group(2)
-            self.size = 10 ** len(self.unknown)  # No ambiguity means 1, '?' means 10, '??' means 100
             if m.group(1):
-                self.size *= int(m.group(1))
+                self.lhs_size = int(m.group(1))  # Known size
+            else:
+                self.lhs_size = None
+            self.total_size = 10 ** len(self.unknown)  # No ambiguity means 1, '?' means 10, '??' means 100
+            if self.lhs_size:
+                self.total_size *= self.lhs_size  # 4?G -> 4*10 G
             self.unit = m.group(3)
 
     def __repr__(self) -> str:
-        if self.size is None or self.unknown is None or self.unit is None:
+        if self.unknown is None or self.unit is None:
             return "?"
-        return str(self.size) + self.unknown + self.unit
+        if self.lhs_size is not None:
+            return str(self.lhs_size) + self.unknown + self.unit
+        return self.unknown + self.unit
 
 
 
@@ -119,7 +126,8 @@ class Repo:
     """Main repository object, stores the groups/items and handles main operations"""
 
     def __init__(self, path: str):
-        self.group = _load_group(self, path, path)
+        self._items: OrderedDict[str, Union[Item, Group]] = OrderedDict()
+        self.group = _load_group(self, os.path.dirname(path), path)
 
 
 # Parsing functions
@@ -183,9 +191,9 @@ def _load_group(repo: Repo, repo_path: str, path: str, priority: Optional[Priori
             except ValueError as e:
                 raise ValueError(f"{_fmt_line(l, path, i+1)}") from e
             if item.name in elems:
-                raise ValueError(f"{_fmt_line(l, path, i+1)}\nRedefinition of {item.name}") from e
+                raise ValueError(f"{_fmt_line(l, path, i+1)}\nRedefinition of {item.name}")
             if is_default and default is not None:
-                raise ValueError(f"{_fmt_line(l, path, i+1)}\nMore than one default value in group") from e
+                raise ValueError(f"{_fmt_line(l, path, i+1)}\nMore than one default value in group")
             elems[item.name] = item
             last_elem_name = item.name
             if is_default:
