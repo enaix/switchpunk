@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, Mapping, MutableMapping, OrderedDict, Sequence, MutableSequence, Tuple, Union
+from typing import Optional, Mapping, MutableMapping, OrderedDict, Sequence, MutableSequence, Tuple, Union, Callable
 import collections
 from enum import Enum
 from pathlib import Path
@@ -66,13 +66,16 @@ PRIORITY_MAP: Mapping = {"Low": Priority.Low, "Medium": Priority.Medium, "High":
 
 
 class RequiresAttr:
-    """Requires:foo/RequiresAny:bar/RequiresAll:xyz item attribute"""
-    def __init__(self, name: str, requires_all: bool = False):
+    """Requires:foo/RequiresAny:bar/RequiresAll:xyz/RequiresOpt:xyz item attribute"""
+    def __init__(self, name: str, requires_all: bool = False, requires_opt: bool = False):
         self.name = name   # Name of the item or group
         self.requires_all = requires_all  # (Only for groups) Require all items in the group, otherwise require only one
+        self.is_optional = requires_opt   # (Only for items) Is an optional dependency
+        if self.requires_all and self.is_optional:
+            raise ValueError(f"RequiresAttr for {self.name} cannot require an optional group")
 
     def __repr__(self) -> str:
-        return f"Requires(name={self.name}, all={self.requires_all})"
+        return f"Requires(name={self.name}, all={self.requires_all}, opt={self.is_optional})"
 
 
 
@@ -102,23 +105,38 @@ class Item:
     def tree(self, depth=0) -> str:
         return '   ' * depth + self.__repr__()
 
+    def each(self, f: Callable[[Union[Item, Group], int], None], depth=0) -> None:
+        """Apply function f to each item/group"""
+        f(self, depth)
+
 
 class Group:
     """Represents a single file (a/b/c.txt) with items"""
-    def __init__(self, name: str, repo: Repo, desc: Optional[str], warn: Optional[str], items: OrderedDict[str, Union[Item, Group]], priority: Optional[Priority] = None):
+    def __init__(self, name: str, repo: Repo, desc: Optional[str], warn: Optional[str], elems: OrderedDict[str, Union[Item, Group]], priority: Optional[Priority] = None):
         self.name = name  # Full group name without .txt (foo.txt)
         self._repo = weakref.ref(Repo)  # Ref to the repo object
         self.desc = desc   # Group description, may be None
         self.warn = warn   # Group warning, may be None
-        self.items = items  # Items or subgroups
+        self._elems = elems  # Items or subgroups
         self.priority = priority  # Priority override
         self.default: Optional[str] = None  # Default item in current group
+
+    def __iter__(self):
+        yield from self._elems
+
+    def __getitem__(self, elem: str) -> Union[Item, Group]:
+        return self._elems[elem]
 
     def __repr__(self) -> str:
         return f"Group(name={self.name}, priority={self.priority}, default={self.default})"
 
+    def each(self, f: Callable[[Union[Item, Group], int], None], depth=0) -> None:
+        """Apply function f to each item/group"""
+        f(self, depth)
+        [x.each(f, depth+1) for x in self._elems.values()]
+
     def tree(self, depth=0) -> str:
-        return '   ' * depth + self.__repr__() + '\n' + '\n'.join([x.tree(depth + 1) for x in self.items.values()])
+        return '   ' * depth + self.__repr__() + '\n' + '\n'.join([x.tree(depth + 1) for x in self._elems.values()])
 
 
 
@@ -126,12 +144,30 @@ class Repo:
     """Main repository object, stores the groups/items and handles main operations"""
 
     def __init__(self, path: str):
-        self._items: OrderedDict[str, Union[Item, Group]] = OrderedDict()
+        self._elems: OrderedDict[str, Union[Item, Group]] = OrderedDict()  # Probably should make it a weakref
         self.group = _load_group(self, os.path.dirname(path), path)
+        _validate(self)
+
+    def __getitem__(self, elem: str) -> Union[Item, Group]:
+        return self._elems[elem]
+
+    def __contains__(self, elem: str) -> bool:
+        return elem in self._elems
 
 
 # Parsing functions
 # =================
+
+
+def _validate(repo: Repo):
+    """Check that the repo is valid (all dependencies exist)"""
+    def check(elem: Union[Item, Group], depth: int) -> None:
+        if type(elem) is Item and elem.requires:
+            for r in elem.requires:
+                if r.name not in repo:
+                    print(repo._elems.keys())
+                    raise ValueError(f"Bad Requires attribute: no such name {r.name} (from {elem.name})")
+    repo.group.each(check)
 
 
 def _fmt_line(line: str, path: str, l: int):
@@ -161,7 +197,10 @@ def _load_group(repo: Repo, repo_path: str, path: str, priority: Optional[Priori
         # Check if this is top-level group file (foo/bar/bar.txt)
         path_base_abs = _path_base_split[0]  # foo/bar/bar -> foo/bar
     path_base = os.path.relpath(path_base_abs, start=repo_path)  # Relative path (from repo)
-    full_group_name = Path(path_base).as_posix()
+    full_group_name = Path(path_base).as_posix()  # Proper full group name (foo/bar)
+    #if full_group_name.startswith("./"):
+    #    full_group_name = full_group_name[2:]
+    print(full_group_name)
 
     #print(path, '->', full_group_name)
 
@@ -190,11 +229,12 @@ def _load_group(repo: Repo, repo_path: str, path: str, priority: Optional[Priori
                 item, is_default = _parse_item_decl(repo, l)
             except ValueError as e:
                 raise ValueError(f"{_fmt_line(l, path, i+1)}") from e
-            if item.name in elems:
+            if item.name in elems or item.name in repo._elems:
                 raise ValueError(f"{_fmt_line(l, path, i+1)}\nRedefinition of {item.name}")
             if is_default and default is not None:
                 raise ValueError(f"{_fmt_line(l, path, i+1)}\nMore than one default value in group")
             elems[item.name] = item
+            repo._elems[item.name] = elems[item.name]
             last_elem_name = item.name
             if is_default:
                 default = item.name
@@ -239,7 +279,8 @@ def _load_group(repo: Repo, repo_path: str, path: str, priority: Optional[Priori
             if len(include_tok[0]) < 9:
                 raise ValueError(f"{_fmt_line(l, path, i+1)}\nInclude should be defined as Include:foo Priority:xyz (optional)")
             group_name = include_tok[0][8:]
-            if group_name in elems:
+            full_name = full_group_name + '/' + group_name if full_group_name != '.' else group_name
+            if group_name in elems or full_name in repo._elems:
                 raise ValueError(f"{_fmt_line(l, path, i+1)}\n{group_name} already declared")
             if len(include_tok) == 2:
                 # Parse priority
@@ -257,8 +298,12 @@ def _load_group(repo: Repo, repo_path: str, path: str, priority: Optional[Priori
                 raise ValueError(f"Failed to import at {path}:{i+1}") from e
 
             elems[group_name] = new_group
+            repo._elems[full_name] = elems[group_name]
+        else:
+            ls = l.split(':')
+            raise ValueError(f"{_fmt_line(l, path, i+1)}\nBad line, no such keyword: {ls[0] if len(ls) > 0 else []}")
 
-    return Group(name=full_group_name, repo=repo, desc=desc, warn=warn, items=elems, priority=priority)
+    return Group(name=full_group_name, repo=repo, desc=desc, warn=warn, elems=elems, priority=priority)
 
 
 def _parse_item_decl(repo: Repo, line: str) -> Tuple[Item, bool]:
@@ -311,6 +356,11 @@ def _parse_item_decl(repo: Repo, line: str) -> Tuple[Item, bool]:
                 if '/' in kv[1]:
                     raise ValueError(f"Bad Requires value: {kv[1]}. Requires should reference an item, not a group. Use RequiresAny/RequiresAll instead")
                 requires.append(RequiresAttr(kv[1]))
+            elif kv[0] == "RequiresOpt":
+                # Same as Requires
+                if '/' in kv[1]:
+                    raise ValueError(f"Bad RequiresOpt value: {kv[1]}. RequiresOpt should reference an optional item, not a group. Use RequiresAny/RequiresAll instead")
+                requires.append(RequiresAttr(kv[1], requires_opt=True))
             elif kv[0] == "RequiresAny":
                 # We assume that this is the group
                 # All groups should have the full path, and this check assumes that requiring the base category (RequiresAny:software) is ill-formed

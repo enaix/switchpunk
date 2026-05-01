@@ -1,6 +1,6 @@
 Desc:knowledge/reference/stackoverflow StackOverflow data dump
 
-[.] Name:StackOverflowArchive ?G RequiresAny:software/reference/stackoverflow,Default:True TODO
+[.] Name:StackOverflowArchive ?G RequiresAny:software/knowledge/reference/stackoverflow,Default:True TODO
     Desc:StackOverflowArchive StackOverflow/StackExchange dump from Internet Archive
     Repo:StackOverflowArchive TODO
 
