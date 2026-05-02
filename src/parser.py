@@ -81,8 +81,9 @@ class RequiresAttr:
 
 class Item:
     """A single item in a group, a piece of software/knowledge/etc"""
-    def __init__(self, name: str, repo: Repo, status: ItemStatus, size: ApproxFileSize, link: Optional[str], requires: Optional[MutableSequence[RequiresAttr]] = None, priority: Optional[Priority] = None):
+    def __init__(self, name: str, full_name: str, repo: Repo, status: ItemStatus, size: ApproxFileSize, link: Optional[str], requires: Optional[MutableSequence[RequiresAttr]] = None, priority: Optional[Priority] = None):
         self.name = name             # Short item name, same as in Name:foo (without Name:)
+        self.full_name = full_name   # Full item name, same as in Name:foo (without Name:) but with a full path
         self._repo = weakref.ref(repo) # Ref to the repo object
         self.status = status     # Status, which is specified in brackets [ ]
         self.size = size  # Estimated item size
@@ -100,20 +101,23 @@ class Item:
         self.install_info: Optional[MutableMapping[str, str]] = None  # Installation information (package names)
 
     def __repr__(self) -> str:
-        return f"Item(name={self.name}, status={self.status}, size={self.size}, link={self.link}, requires={self.requires}, priority={self.priority})"
+        return f"Item(name={self.name}, full_name={self.full_name}, status={self.status}, size={self.size}, link={self.link}, requires={self.requires}, priority={self.priority})"
 
     def tree(self, depth=0) -> str:
         return '   ' * depth + self.__repr__()
 
-    def each(self, f: Callable[[Union[Item, Group], int], None], depth=0) -> None:
+    def each(self, f: Callable[[Union[Item, Group], int, list[str]], None], depth=0, path: Optional[list[str]] = None) -> None:
         """Apply function f to each item/group"""
-        f(self, depth)
+        if path is None:
+            path = []
+        f(self, depth, path)
 
 
 class Group:
     """Represents a single file (a/b/c.txt) with items"""
-    def __init__(self, name: str, repo: Repo, desc: Optional[str], warn: Optional[str], elems: OrderedDict[str, Union[Item, Group]], priority: Optional[Priority] = None):
-        self.name = name  # Full group name without .txt (foo.txt)
+    def __init__(self, name: str, full_name: str, repo: Repo, desc: Optional[str], warn: Optional[str], elems: OrderedDict[str, Union[Item, Group]], priority: Optional[Priority] = None):
+        self.name = name  # Short group name without .txt (bar.txt -> bar)
+        self.full_name = full_name  # Full group name without .txt (bar.txt -> foo/bar)
         self._repo = weakref.ref(Repo)  # Ref to the repo object
         self.desc = desc   # Group description, may be None
         self.warn = warn   # Group warning, may be None
@@ -128,12 +132,14 @@ class Group:
         return self._elems[elem]
 
     def __repr__(self) -> str:
-        return f"Group(name={self.name}, priority={self.priority}, default={self.default})"
+        return f"Group(name={self.name}, full_name={self.full_name}, priority={self.priority}, default={self.default})"
 
-    def each(self, f: Callable[[Union[Item, Group], int], None], depth=0) -> None:
+    def each(self, f: Callable[[Union[Item, Group], int, list[str]], None], depth=0, path: Optional[list[str]] = None) -> None:
         """Apply function f to each item/group"""
-        f(self, depth)
-        [x.each(f, depth+1) for x in self._elems.values()]
+        if path is None:
+            path = []
+        f(self, depth, path)
+        [x.each(f, depth+1, path + [self.name]) for x in self._elems.values()]
 
     def tree(self, depth=0) -> str:
         return '   ' * depth + self.__repr__() + '\n' + '\n'.join([x.tree(depth + 1) for x in self._elems.values()])
@@ -144,15 +150,24 @@ class Repo:
     """Main repository object, stores the groups/items and handles main operations"""
 
     def __init__(self, path: str):
-        self._elems: OrderedDict[str, Union[Item, Group]] = OrderedDict()  # Probably should make it a weakref
+        self._elems: OrderedDict[str, weakref.ReferenceType[Union[Item, Group]]] = OrderedDict()  # Probably should make it a weakref
         self.group = _load_group(self, os.path.dirname(path), path)
         _validate(self)
 
     def __getitem__(self, elem: str) -> Union[Item, Group]:
-        return self._elems[elem]
+        e = self._elems[elem]()
+        if e is None:
+            raise ValueError(f"Repo assertion failed: {e} is None")
+        return e
 
     def __contains__(self, elem: str) -> bool:
         return elem in self._elems
+
+    def __iter__(self):
+        yield from self._elems
+
+    def __len__(self):
+        return len(self._elems)
 
 
 # Parsing functions
@@ -161,16 +176,65 @@ class Repo:
 
 def _validate(repo: Repo):
     """Check that the repo is valid (all dependencies exist)"""
-    def check(elem: Union[Item, Group], depth: int) -> None:
+
+    item_name_re = re.compile("^[0-9A-z\-\_]*$")
+    group_name_re = re.compile("^[0-9A-z\-\_\/]*$")
+
+    def fmt_error(elem: Union[Item, Group], path: list[str]) -> str:
+        return f"At {' -> '.join(['\''+x+'\'' for x in path])} => {elem.name}"
+
+    def check_item_name(name: str, elem: Union[Item, Group], path: list[str]):
+        if re.fullmatch(item_name_re, name) is None:
+            raise ValueError(f"{fmt_error(elem, path)}\nBad item name \"{name}\". Names must only contain digits, letters and symbols '-', '_'")
+
+    def check_group_name(name: str, elem: Union[Item, Group], path: list[str]):
+        if re.fullmatch(group_name_re, name) is None:
+            raise ValueError(f"{fmt_error(elem, path)}\nBad group name \"{name}\". Names must only contain digits, letters and symbols '-', '_', '/'")
+
+    total_elems = 0
+    def check(elem: Union[Item, Group], depth: int, path: list[str]) -> None:
+        nonlocal total_elems  # Capture the variable defined above
+        total_elems += 1
+        # Check full name
+        clearpath = list(filter(lambda x: len(x) > 0, path))  # Remove empty names
+        true_full_name = '/'.join(clearpath) + '/' + elem.name if clearpath else elem.name
+        if elem.full_name != true_full_name:
+            raise ValueError(f"{fmt_error(elem, path)}\nBad full elem name: expected \"{true_full_name}\", got \"{elem.full_name}\"")
+
         if type(elem) is Item and elem.requires:
+            # Check Requires attr
             for r in elem.requires:
                 if r.name not in repo:
-                    print(repo._elems.keys())
-                    raise ValueError(f"Bad Requires attribute: no such name {r.name} (from {elem.name})")
+                    #print(repo._elems.keys())
+                    raise ValueError(f"{fmt_error(elem, path)}\nBad Requires attribute: no such name {r.name} (from {elem.name})")
+                if type(repo[r.name]) is Item and r.requires_all:
+                    raise ValueError(f"{fmt_error(elem, path)}\nBad Requires attribute: requires_all cannot be true while {repo[r.name].name} is an Item")
+                if type(repo[r.name]) is Group and r.is_optional:
+                    raise ValueError(f"{fmt_error(elem, path)}\nBad Requires attribute: is_optional cannot be true while {repo[r.name].name} is a Group")
+
+            # Check for bad symbols
+            if type(elem) is Item:
+                check_item_name(elem.name, elem, path)
+            else:
+                check_group_name(elem.name, elem, path)
+
+    # TODO add more validation
     repo.group.each(check)
 
+    if len(repo) + 1 != total_elems:  # root is not included in cache
+        raise ValueError(f"Size of repo cache ({len(repo) + 1}) != actual repo ({total_elems})")
+    # Check repo keys
+    for key in repo:
+        if type(repo[key]) is Group:
+            if key != repo[key].full_name:
+                raise ValueError(f"Group name mismatch in cache: (repo) {key} != (actual) {repo[key].full_name}")
+        else:
+            if key != repo[key].name:
+                raise ValueError(f"Item name mismatch in cache: (repo) {key} != (actual) {repo[key].name}")
+    # Since full paths are guaranteed to be valid, keys match full paths and the number of elements matches, then all elements are stored correctly
 
-def _fmt_line(line: str, path: str, l: int):
+
+def _fmt_line(line: str, path: str, l: int) -> str:
     """Format the line where a parsing error occured"""
     return f"At {path}:{l+1}:\n{line}\n{'^' * len(line)}"
 
@@ -197,10 +261,14 @@ def _load_group(repo: Repo, repo_path: str, path: str, priority: Optional[Priori
         # Check if this is top-level group file (foo/bar/bar.txt)
         path_base_abs = _path_base_split[0]  # foo/bar/bar -> foo/bar
     path_base = os.path.relpath(path_base_abs, start=repo_path)  # Relative path (from repo)
+
+    # Group name
     full_group_name = Path(path_base).as_posix()  # Proper full group name (foo/bar)
-    #if full_group_name.startswith("./"):
-    #    full_group_name = full_group_name[2:]
-    print(full_group_name)
+    if full_group_name == ".":
+        full_group_name = "" # Treat this as root
+    short_group_name = os.path.basename(path_base)  # Short group name (bar.txt -> bar)
+    if short_group_name == ".":
+        short_group_name = "" # Treat this as root
 
     #print(path, '->', full_group_name)
 
@@ -226,7 +294,7 @@ def _load_group(repo: Repo, repo_path: str, path: str, priority: Optional[Priori
         elif l[0] == "[":
             # Item declaration
             try:
-                item, is_default = _parse_item_decl(repo, l)
+                item, is_default = _parse_item_decl(repo, l, full_group_name)
             except ValueError as e:
                 raise ValueError(f"{_fmt_line(l, path, i+1)}") from e
             if item.name in elems or item.name in repo._elems:
@@ -234,7 +302,7 @@ def _load_group(repo: Repo, repo_path: str, path: str, priority: Optional[Priori
             if is_default and default is not None:
                 raise ValueError(f"{_fmt_line(l, path, i+1)}\nMore than one default value in group")
             elems[item.name] = item
-            repo._elems[item.name] = elems[item.name]
+            repo._elems[item.name] = weakref.ref(elems[item.name])
             last_elem_name = item.name
             if is_default:
                 default = item.name
@@ -278,8 +346,10 @@ def _load_group(repo: Repo, repo_path: str, path: str, priority: Optional[Priori
 
             if len(include_tok[0]) < 9:
                 raise ValueError(f"{_fmt_line(l, path, i+1)}\nInclude should be defined as Include:foo Priority:xyz (optional)")
-            group_name = include_tok[0][8:]
-            full_name = full_group_name + '/' + group_name if full_group_name != '.' else group_name
+
+            group_name = include_tok[0][8:]  # Short group name
+            full_name = full_group_name + '/' + group_name if full_group_name else group_name  # Get full group name (from root)
+
             if group_name in elems or full_name in repo._elems:
                 raise ValueError(f"{_fmt_line(l, path, i+1)}\n{group_name} already declared")
             if len(include_tok) == 2:
@@ -298,15 +368,15 @@ def _load_group(repo: Repo, repo_path: str, path: str, priority: Optional[Priori
                 raise ValueError(f"Failed to import at {path}:{i+1}") from e
 
             elems[group_name] = new_group
-            repo._elems[full_name] = elems[group_name]
+            repo._elems[full_name] = weakref.ref(elems[group_name])
         else:
             ls = l.split(':')
             raise ValueError(f"{_fmt_line(l, path, i+1)}\nBad line, no such keyword: {ls[0] if len(ls) > 0 else []}")
 
-    return Group(name=full_group_name, repo=repo, desc=desc, warn=warn, elems=elems, priority=priority)
+    return Group(name=short_group_name, full_name=full_group_name, repo=repo, desc=desc, warn=warn, elems=elems, priority=priority)
 
 
-def _parse_item_decl(repo: Repo, line: str) -> Tuple[Item, bool]:
+def _parse_item_decl(repo: Repo, line: str, full_group_name: str) -> Tuple[Item, bool]:
     """Parse the item declaration without Desc/Warn/Repo fields"""
 
     tokens = line.split(' ')
@@ -383,4 +453,5 @@ def _parse_item_decl(repo: Repo, line: str) -> Tuple[Item, bool]:
     # Parse the link
     link = tokens[4]
 
-    return Item(name=name, repo=repo, status=status, size=size, link=link, requires=requires, priority=priority), default
+    full_name = full_group_name + '/' + name if full_group_name else name
+    return Item(name=name, full_name=full_name, repo=repo, status=status, size=size, link=link, requires=requires, priority=priority), default
