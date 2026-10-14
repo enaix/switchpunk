@@ -1,0 +1,178 @@
+#!/bin/sh
+
+_get_grep_color_opts ()
+{
+    # Add "--color=auto" to arguments if grep supports it
+    if [ "$(grep --help | grep color | wc -l)" -gt 0 ]; then
+        GREP_COLOR_OPTS="--color=auto"
+    else
+        GREP_COLOR_OPTS=""
+    fi
+}
+
+_init_dry_run ()
+{
+    # If dry run mode is enabled, prepend each command with "echo"
+    if [ -z "$DRY_RUN" ]; then
+        DRY_RUN_CMD=""
+    else
+        DRY_RUN_CMD="echo"
+    fi
+}
+
+get_item ()
+{
+    # Get the unique item in the repo by its name and print its entry
+    #
+    # Env variables/arguments:
+    # $SWPUNK_REPO : repo folder
+    # $HUMAN_READABLE : enable human-readable (verbose) mode
+    # $DRY_RUN_CMD : either "echo" or ""
+    # $1 - ... : get item or multiple items
+    #
+    # SIMPLE ALTERNATIVE: grep path_to_repo -rwe "Name:abc" -e "Desc:abc" -e "Warn:abc" -e "Repo:abc"
+
+    if [ $# -eq 0 ]; then
+        echo "No item to get. Please specify one or more arguments" >&2
+        return 1
+    fi
+
+    # Only used if SWPUNK_REPO is set
+    if [ -z "$HUMAN_READABLE" ]; then
+        GREP_FLAGS="-hr"  # Disable line output in default mode
+    else
+        GREP_FLAGS="-r"   # Enable in human-readable mode
+    fi
+
+    # Construct the string to pass into grep
+    N=$#
+    while [ "$N" -gt 0 ]; do
+        # replace [foo bar baz] with [foo bar baz -e "Name:foo" -e ... ]
+        set -- "$@" -e "Name:$1" -e "Desc:$1" -e "Warn:$1" -e "Repo:$1"
+        shift         # drop [foo]
+        N=$((N - 1))  # do at least N times, so that [foo bar baz] are replaced
+    done
+
+    if [ -z "$SWPUNK_REPO" ]; then  # read from stdin
+        $DRY_RUN_CMD cat - | grep "-w" "$@"
+    else
+        $DRY_RUN_CMD grep "${GREP_FLAGS}w" "$@" -- "$SWPUNK_REPO"
+    fi
+}
+
+requires ()
+{
+    # Find requirements of an item
+    #
+    # Env variables/arguments:
+    # $SWPUNK_REPO : repo folder
+    # $HUMAN_READABLE : enable human-readable (verbose) mode
+    # $2 : optional item name
+    return 0
+}
+
+search_item ()
+{
+    # Search for all string matches (case-insensitive)
+    #
+    # Env variables/arguments:
+    # $SWPUNK_REPO : repo folder
+    # $HUMAN_READABLE : enable human-readable (verbose) mode
+    # $DRY_RUN_CMD : either "echo" or ""
+    # $1 - ... : item name (or multiple items)
+    #
+    # SIMPLE ALTERNATIVE: grep path_to_repo -rie "abc" -e "xyz"
+
+    if [ $# -eq 0 ]; then
+        echo "No item to search. Please specify one or more arguments" >&2
+        return 1
+    fi
+
+    # Only used if SWPUNK_REPO is set
+    if [ -z "$HUMAN_READABLE" ]; then
+        GREP_FLAGS="-hr"  # Disable line output in default mode
+    else
+        GREP_FLAGS="-r"   # Enable in human-readable mode
+    fi
+
+    # Construct the string to pass into grep
+    N=$#
+    while [ "$N" -gt 0 ]; do
+        # replace [foo bar baz] with [foo bar baz -e foo], we append -e ... to the end of $@
+        set -- "$@" -e "$1"
+        shift         # drop [foo]
+        N=$((N - 1))  # do at least N times, so that [foo bar baz] are replaced
+    done
+
+    if [ -z "$SWPUNK_REPO" ]; then  # read from stdin
+        $DRY_RUN_CMD cat - | grep $GREP_COLOR_OPTS -i "$@"
+    else
+        $DRY_RUN_CMD grep "$GREP_FLAGS" $GREP_COLOR_OPTS -i "$@" -- "$SWPUNK_REPO"
+    fi
+}
+
+_print_help ()
+{
+    echo "Usage: swpunk [OPTIONS] COMMAND [COMMAND_ARGS]"
+    echo ""
+    echo "Common:"
+    echo "  -r REPO   set repo folder to REPO, read from stdin by default"
+    echo "  -d        enable dry-run mode, only print commands"
+    echo ""
+    echo "Output:"
+    echo "  -h        enable verbose human-readable mode"
+
+    echo ""
+}
+
+
+
+# ============================================
+# ==============     SWPUNK     ==============
+#
+#       Welcome to the switchpunk shell!
+# ============================================
+
+
+
+if [ "$#" -lt 2 ]; then
+    _print_help
+    exit 1
+fi
+
+SWPUNK_REPO=""
+HUMAN_READABLE=""
+DRY_RUN=""
+
+# Parse optional args:
+while getopts r:hd opt; do
+    case "$opt" in
+        r) SWPUNK_REPO="$OPTARG";;
+        h) HUMAN_READABLE="1";;
+        d) DRY_RUN="1";;
+        *) _print_help ;;
+    esac
+done
+shift $((OPTIND-1))  # discard the parsed arguments
+
+
+# Parse RHS args:
+if [ "$#" -lt 1 ]; then
+    _print_help
+    exit 1
+fi
+COMMAND="$1"
+shift 1  # discard the command argument
+
+# Pre-compute some params and init variables
+_get_grep_color_opts
+_init_dry_run
+
+# Execute the command
+case "$COMMAND" in
+    get)    get_item "$@" ;;
+    search) search_item "$@" ;;
+    *)      echo "Command not found: $COMMAND." >&2
+            _print_help
+            exit 1 ;;
+esac
