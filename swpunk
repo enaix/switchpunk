@@ -1,5 +1,27 @@
 #!/bin/sh
 
+_print_help ()
+{
+    echo "Usage: swpunk [OPTIONS] COMMAND [COMMAND_ARGS]"
+    echo ""
+    echo "Commands:"
+    echo "  get FOO [BAR...]          get items from the registry"
+    echo "  search FOO [BAR...]       search for matching text"
+    echo "  where FOO [BAR...]        print the file where the entry is present"
+    echo ""
+    echo "Common:"
+    echo "  -r REPO                   set repo folder to REPO, read from stdin by default"
+    echo "  -d                        enable dry-run mode, only print commands"
+    echo ""
+    echo "Output:"
+    echo "  -h                        enable verbose human-readable mode"
+    echo "  -f FIELDS                 print out the following comma-separated fields;"
+    echo "                            the result is separated with spaces"
+    echo ""
+    echo "FIELDS may contain ..."
+    echo ""
+}
+
 _get_grep_color_opts ()
 {
     # Add "--color=auto" to arguments if grep supports it
@@ -20,6 +42,78 @@ _init_dry_run ()
     fi
 }
 
+_process_fields ()
+{
+    # Process the fields command-line argument
+    # This function takes in the value of the -f argument and sets the env variables
+    if [ -z "$1" ]; then
+        return 0
+    fi
+
+    PRINT_NAME=""
+    rhs="$1"
+    IFS=','
+    # super janky split str
+    while read -r tok rhs <<EOF
+$rhs
+EOF
+    do
+        case "$tok" in
+            name) PRINT_NAME=1;;
+            *)    echo "-f: field not found: ${tok}." >&2
+                  _print_help
+                  exit 1;;
+        esac
+
+        if [ -z "$rhs" ]; then
+            break
+        fi
+    done
+}
+
+fmt ()
+{
+    # Format the function input
+    #
+    # Env variables/arguments:
+    # TODO fill in the docstring
+
+    AWK_PRINT_STMT=""
+    AWK_FIRST_ARG_DONE=""
+
+    if [ -z "$FIELDS" ]; then
+        cat -
+    fi
+
+    rhs="$FIELDS"
+    IFS=','
+    # super janky split str
+    while read -r tok rhs <<EOF
+$rhs
+EOF
+    do
+        if [ -z "$AWK_FIRST_ARG_DONE" ]; then
+            AWK_PRINT_STMT="${AWK_PRINT_STMT},"
+        fi
+
+        case "$tok" in
+            name) AWK_PRINT_STMT="${AWK_PRINT_STMT}entry[2]";;
+            size) AWK_PRINT_STMT="${AWK_PRINT_STMT}entry[3]";;
+            keys) AWK_PRINT_STMT="${AWK_PRINT_STMT}entry[4]";;
+            link) AWK_PRINT_STMT="${AWK_PRINT_STMT}entry[5]";;
+            *)    echo "-f: field not found: ${tok}." >&2
+                  _print_help
+                  exit 1;;
+        esac
+
+        AWK_FIRST_ARG_DONE=1
+
+        if [ -z "$rhs" ]; then
+            break
+        fi
+    done
+}
+
 get_item ()
 {
     # Get the unique item in the repo by its name and print its entry
@@ -28,9 +122,10 @@ get_item ()
     # $SWPUNK_REPO : repo folder
     # $HUMAN_READABLE : enable human-readable (verbose) mode
     # $DRY_RUN_CMD : either "echo" or ""
+    # $ONLY_PRINT_FILE : print where is the item located
     # $1 - ... : get item or multiple items
     #
-    # SIMPLE ALTERNATIVE: grep path_to_repo -rwe "Name:abc" -e "Desc:abc" -e "Warn:abc" -e "Repo:abc"
+    # SIMPLE ALTERNATIVE: grep -rwe "Name:abc" -e "Desc:abc" -e "Warn:abc" -e "Repo:abc" -- path_to_repo
 
     if [ $# -eq 0 ]; then
         echo "No item to get. Please specify one or more arguments" >&2
@@ -38,10 +133,20 @@ get_item ()
     fi
 
     # Only used if SWPUNK_REPO is set
+    # TODO check if we should handle the case where grep doesn't have -r flag
     if [ -z "$HUMAN_READABLE" ]; then
         GREP_FLAGS="-hr"  # Disable line output in default mode
     else
         GREP_FLAGS="-r"   # Enable in human-readable mode
+    fi
+
+    if [ "$ONLY_PRINT_FILE" = "1" ]; then
+        if [ -z "$SWPUNK_REPO" ]; then
+            echo "File search requires REPO to be set" >&2
+            _print_help
+            exit 1
+        fi
+        GREP_FLAGS="${GREP_FLAGS}Fl"
     fi
 
     # Construct the string to pass into grep
@@ -81,7 +186,7 @@ search_item ()
     # $DRY_RUN_CMD : either "echo" or ""
     # $1 - ... : item name (or multiple items)
     #
-    # SIMPLE ALTERNATIVE: grep path_to_repo -rie "abc" -e "xyz"
+    # SIMPLE ALTERNATIVE: grep -rie "abc" -e "xyz" -- path_to_repo
 
     if [ $# -eq 0 ]; then
         echo "No item to search. Please specify one or more arguments" >&2
@@ -89,6 +194,7 @@ search_item ()
     fi
 
     # Only used if SWPUNK_REPO is set
+    # TODO check if we should handle the case where grep doesn't have -r flag
     if [ -z "$HUMAN_READABLE" ]; then
         GREP_FLAGS="-hr"  # Disable line output in default mode
     else
@@ -111,19 +217,6 @@ search_item ()
     fi
 }
 
-_print_help ()
-{
-    echo "Usage: swpunk [OPTIONS] COMMAND [COMMAND_ARGS]"
-    echo ""
-    echo "Common:"
-    echo "  -r REPO   set repo folder to REPO, read from stdin by default"
-    echo "  -d        enable dry-run mode, only print commands"
-    echo ""
-    echo "Output:"
-    echo "  -h        enable verbose human-readable mode"
-
-    echo ""
-}
 
 
 
@@ -134,7 +227,7 @@ _print_help ()
 # ============================================
 
 
-
+# TODO remove this
 if [ "$#" -lt 2 ]; then
     _print_help
     exit 1
@@ -143,13 +236,15 @@ fi
 SWPUNK_REPO=""
 HUMAN_READABLE=""
 DRY_RUN=""
+FIELDS=""
 
 # Parse optional args:
-while getopts r:hd opt; do
+while getopts r:hdf: opt; do
     case "$opt" in
         r) SWPUNK_REPO="$OPTARG";;
         h) HUMAN_READABLE="1";;
         d) DRY_RUN="1";;
+        f) FIELDS="$OPTARG";;
         *) _print_help ;;
     esac
 done
@@ -167,11 +262,15 @@ shift 1  # discard the command argument
 # Pre-compute some params and init variables
 _get_grep_color_opts
 _init_dry_run
+_process_fields "$FIELDS"
+ONLY_PRINT_FILE=""
 
 # Execute the command
 case "$COMMAND" in
     get)    get_item "$@" ;;
     search) search_item "$@" ;;
+    where)  ONLY_PRINT_FILE=1
+            get_item "$@";;
     *)      echo "Command not found: $COMMAND." >&2
             _print_help
             exit 1 ;;
