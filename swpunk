@@ -78,11 +78,13 @@ fmt ()
     # Env variables/arguments:
     # TODO fill in the docstring
 
+    AWK_CODE="split(\$0,entry,\" \"); "
     AWK_PRINT_STMT=""
     AWK_FIRST_ARG_DONE=""
 
     if [ -z "$FIELDS" ]; then
         cat -
+        return 0
     fi
 
     rhs="$FIELDS"
@@ -92,12 +94,14 @@ fmt ()
 $rhs
 EOF
     do
-        if [ -z "$AWK_FIRST_ARG_DONE" ]; then
+        if [ "$AWK_FIRST_ARG_DONE" = "1" ]; then
             AWK_PRINT_STMT="${AWK_PRINT_STMT},"
         fi
 
+        # TODO add Desc: and other fields handling (somehow), add approx size handling
         case "$tok" in
-            name) AWK_PRINT_STMT="${AWK_PRINT_STMT}entry[2]";;
+            name) AWK_PRINT_STMT="${AWK_PRINT_STMT}entry[2]"
+                  AWK_CODE="${AWK_CODE}sub(\"^Name:\", \"\", entry[2]); ";;  # remove Name: prefix
             size) AWK_PRINT_STMT="${AWK_PRINT_STMT}entry[3]";;
             keys) AWK_PRINT_STMT="${AWK_PRINT_STMT}entry[4]";;
             link) AWK_PRINT_STMT="${AWK_PRINT_STMT}entry[5]";;
@@ -112,6 +116,8 @@ EOF
             break
         fi
     done
+
+    cat - | grep -e "Name:" | awk "{${AWK_CODE}print(${AWK_PRINT_STMT})}"
 }
 
 get_item ()
@@ -159,9 +165,9 @@ get_item ()
     done
 
     if [ -z "$SWPUNK_REPO" ]; then  # read from stdin
-        $DRY_RUN_CMD cat - | grep "-w" "$@"
+        $DRY_RUN_CMD cat - | grep "-w" "$@" | fmt
     else
-        $DRY_RUN_CMD grep "${GREP_FLAGS}w" "$@" -- "$SWPUNK_REPO"
+        $DRY_RUN_CMD grep "${GREP_FLAGS}w" "$@" -- "$SWPUNK_REPO" | fmt
     fi
 }
 
@@ -262,7 +268,7 @@ shift 1  # discard the command argument
 # Pre-compute some params and init variables
 _get_grep_color_opts
 _init_dry_run
-_process_fields "$FIELDS"
+#_process_fields "$FIELDS"
 ONLY_PRINT_FILE=""
 
 # Execute the command

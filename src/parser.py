@@ -219,6 +219,7 @@ def _validate(repo: Repo):
                 check_group_name(elem.name, elem, path)
 
     # TODO add more validation
+    # TODO check that registered keywords are in Name/Desc fields
     repo.group.each(check)
 
     if len(repo) + 1 != total_elems:  # root is not included in cache
@@ -237,6 +238,9 @@ def _validate(repo: Repo):
 def _fmt_line(line: str, path: str, l: int) -> str:
     """Format the line where a parsing error occured"""
     return f"At {path}:{l+1}:\n{line}\n{'^' * len(line)}"
+
+
+# TODO refactor _load_group and _parse_item_decl to have directories/names and actual parsing logic separate
 
 
 def _load_group(repo: Repo, repo_path: str, path: str, priority: Optional[Priority] = None) -> Group:
@@ -277,6 +281,8 @@ def _load_group(repo: Repo, repo_path: str, path: str, priority: Optional[Priori
             lines = f.readlines()
     except OSError as e:
         raise OSError(errno.ENOENT, f"Could not find {path}") from e
+
+    # TODO raise an error if there is no Include: statement, but a directory is present
 
 
     # Parsing logic
